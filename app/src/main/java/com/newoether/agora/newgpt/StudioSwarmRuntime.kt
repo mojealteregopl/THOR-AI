@@ -1,5 +1,7 @@
 package com.newoether.agora.newgpt
 
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.withTimeout
 import java.util.ArrayDeque
 
@@ -28,6 +30,26 @@ data class SwarmRecord(
     val modelSlot: Int,
     val output: String,
 )
+
+/**
+ * Events emitted only after the plan is validated.
+ * A completed event is emitted after output validation and before the next handoff.
+ * Consumers should treat model text as untrusted data.
+ */
+sealed interface SwarmExecutionEvent {
+    data class Started(
+        val step: Int,
+        val total: Int,
+        val agentName: String,
+        val modelSlot: Int,
+    ) : SwarmExecutionEvent
+
+    data class Completed(
+        val step: Int,
+        val total: Int,
+        val record: SwarmRecord,
+    ) : SwarmExecutionEvent
+}
 
 fun interface SwarmInference {
     suspend fun generate(modelSlot: Int, systemPrompt: String, userPrompt: String): String
@@ -87,12 +109,14 @@ class StudioSwarmRuntime(
         agents: List<SwarmAgent>,
         rootId: String,
         task: String,
+        onEvent: suspend (SwarmExecutionEvent) -> Unit = {},
     ): List<SwarmRecord> {
         require(task.isNotBlank() && task.length <= 8_000) { "Task must have 1..8000 characters" }
         val steps = compiler.compile(agents, rootId)
         val completed = linkedMapOf<String, SwarmRecord>()
 
-        for (step in steps) {
+        for ((index, step) in steps.withIndex()) {
+            currentCoroutineContext().ensureActive()
             val parent = step.parentId?.let { id ->
                 checkNotNull(completed[id]) { "Missing parent execution: $id" }
             }
@@ -109,17 +133,35 @@ class StudioSwarmRuntime(
                 }
             }
             require(input.length <= 24_000) { "Agent input budget exceeded" }
+            onEvent(
+                SwarmExecutionEvent.Started(
+                    step = index + 1,
+                    total = steps.size,
+                    agentName = step.agent.name,
+                    modelSlot = step.modelSlot,
+                ),
+            )
+            currentCoroutineContext().ensureActive()
             val output = withTimeout(stepTimeoutMs) {
                 inference.generate(step.modelSlot, step.agent.systemPrompt, input)
             }.trim()
+            currentCoroutineContext().ensureActive()
             require(output.isNotEmpty() && output.length <= 12_000) {
                 "Model returned empty or oversized output for ${step.agent.name}"
             }
-            completed[step.agent.id] = SwarmRecord(
+            val record = SwarmRecord(
                 agentId = step.agent.id,
                 agentName = step.agent.name,
                 modelSlot = step.modelSlot,
                 output = output,
+            )
+            completed[step.agent.id] = record
+            onEvent(
+                SwarmExecutionEvent.Completed(
+                    step = index + 1,
+                    total = steps.size,
+                    record = record,
+                ),
             )
         }
         return completed.values.toList()
