@@ -254,7 +254,7 @@ fun NewGptStudioScreen(onClose: () -> Unit) {
                 contentColor = Gold,
                 edgePadding = 8.dp,
             ) {
-                listOf("AGENTS", "APP BUILDER", "GGUF ×2", "GITHUB", "THOR SWARM", "ŹRÓDŁA 01").forEachIndexed { index, title ->
+                listOf("AGENTS", "APP BUILDER", "GGUF ×2", "GITHUB", "THOR SWARM", "ŹRÓDŁA 01", "ŹRÓDŁA 02").forEachIndexed { index, title ->
                     Tab(
                         selected = tab == index,
                         onClick = { tab = index },
@@ -313,6 +313,28 @@ fun NewGptStudioScreen(onClose: () -> Unit) {
                         dualRuntime.close()
                         modelStatus = "Modele zwolnione z pamięci."
                     }
+                )
+                6 -> ThorPacketTwoPanel(
+                    importedIds = agents.map { it.id }.toSet(),
+                    status = sourceCatalogStatus,
+                    onImport = { role ->
+                        if (agents.any { it.id == role.id }) {
+                            sourceCatalogStatus = "Profil jest już w AGENTS."
+                        } else {
+                            val imported = StudioAgent(
+                                id = role.id,
+                                name = role.name,
+                                description = role.description,
+                                systemPrompt = role.prompt,
+                                tools = emptyList(),
+                                handoffs = emptyList(),
+                            )
+                            agents = (agents + imported).sortedBy { it.name.lowercase() }
+                            saveAgents(context, agents)
+                            sourceCatalogStatus = "Dodano: " + role.name +
+                                ". Profil nie otrzymuje automatycznie dostępu do narzędzi."
+                        }
+                    },
                 )
                 5 -> ThorPacketOnePanel(
                     importedIds = agents.map { it.id }.toSet(),
