@@ -2,7 +2,7 @@ name: Build APK
 
 on:
   push:
-    branches: [master]
+    branches: [master, omega/thor-agent-swarm]
   pull_request:
     branches: [master]
   workflow_dispatch:

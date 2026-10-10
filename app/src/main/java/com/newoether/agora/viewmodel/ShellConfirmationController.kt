@@ -33,7 +33,8 @@ class ShellConfirmationController(
     data class PendingShellCommand(
         val server: String,
         val summary: String,
-        val deferred: CompletableDeferred<Boolean>
+        val deferred: CompletableDeferred<Boolean>,
+        val mandatory: Boolean = false,
     )
 
     private val _pendingShellCommand = MutableStateFlow<PendingShellCommand?>(null)
@@ -47,25 +48,38 @@ class ShellConfirmationController(
     // times out refused.
     private val promptMutex = Mutex()
 
-    /** Suspends until the user resolves the prompt; returns whether the command may run. */
-    suspend fun confirm(server: String, summary: String): Boolean {
-        if (!settings.shellConfirmEnabled.value) return true
-        if (sessionAllowedServers.contains(server)) return true
-        // A Worker has no UI surface while the app is backgrounded. Refuse immediately instead
-        // of occupying the tool loop for the full confirmation timeout.
+    /** User-configurable policy for ordinary shell commands. */
+    suspend fun confirm(server: String, summary: String): Boolean =
+        confirmInternal(server, summary, mandatory = false)
+
+    /**
+     * Mandatory per-invocation approval for external MCP calls.
+     * Always prompts, even if shell confirmation is disabled or the server was trusted
+     * for ordinary shell commands. Background tasks cannot answer and are denied.
+     */
+    suspend fun confirmRequired(server: String, summary: String): Boolean =
+        confirmInternal(server, summary, mandatory = true)
+
+    private suspend fun confirmInternal(
+        server: String,
+        summary: String,
+        mandatory: Boolean,
+    ): Boolean {
+        if (!mandatory && !settings.shellConfirmEnabled.value) return true
+        if (!mandatory && sessionAllowedServers.contains(server)) return true
         if (!appForeground.value) return false
+
         return promptMutex.withLock {
-            // Re-check after the wait — the user may have trusted this server while an
-            // earlier conversation's prompt was up.
-            if (sessionAllowedServers.contains(server)) return@withLock true
+            if (!mandatory && sessionAllowedServers.contains(server)) return@withLock true
             if (!appForeground.value) return@withLock false
             val deferred = CompletableDeferred<Boolean>()
-            _pendingShellCommand.value = PendingShellCommand(server, summary, deferred)
+            _pendingShellCommand.value = PendingShellCommand(
+                server = server,
+                summary = summary,
+                deferred = deferred,
+                mandatory = mandatory,
+            )
             try {
-                // Activity recreation keeps this process-scoped prompt alive. Moving the whole app
-                // to the background is different: there is no visible decision surface, so cancel
-                // the wait immediately. The timeout remains a final safety bound for a foreground
-                // Activity that never answers.
                 withTimeout(Constants.SHELL_CONFIRM_TIMEOUT_MS) {
                     coroutineScope {
                         val backgrounded = async {
@@ -82,10 +96,12 @@ class ShellConfirmationController(
                         }
                     }
                 }
-            } catch (e: TimeoutCancellationException) {
+            } catch (_: TimeoutCancellationException) {
                 false
             } finally {
-                if (_pendingShellCommand.value?.deferred === deferred) _pendingShellCommand.value = null
+                if (_pendingShellCommand.value?.deferred === deferred) {
+                    _pendingShellCommand.value = null
+                }
             }
         }
     }
@@ -93,7 +109,9 @@ class ShellConfirmationController(
     /** Called by the UI to resolve a pending confirmation. */
     fun resolve(allow: Boolean, alwaysAllowServer: Boolean = false) {
         val pending = _pendingShellCommand.value ?: return
-        if (allow && alwaysAllowServer) sessionAllowedServers.add(pending.server)
+        if (allow && alwaysAllowServer && !pending.mandatory) {
+            sessionAllowedServers.add(pending.server)
+        }
         pending.deferred.complete(allow)
         _pendingShellCommand.value = null
     }

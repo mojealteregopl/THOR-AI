@@ -477,7 +477,7 @@ fun MainNavigation(
             containerColor = MaterialTheme.colorScheme.surfaceContainer,
             onDismissRequest = { viewModel.resolveShellConfirmation(allow = false) },
             icon = { Icon(Icons.Default.Terminal, null, modifier = Modifier.size(40.dp), tint = MaterialTheme.colorScheme.primary) },
-            title = { Text(stringResource(R.string.shell_confirm_title, pending.server), fontWeight = FontWeight.Bold) },
+            title = { Text(if (pending.mandatory) "Zatwierdź pojedyncze wywołanie MCP: ${pending.server}" else stringResource(R.string.shell_confirm_title, pending.server), fontWeight = FontWeight.Bold) },
             text = {
                 Column {
                     Box(
@@ -489,7 +489,7 @@ fun MainNavigation(
                         ChatMarkdownCodeBlock(code = pending.summary)
                     }
                     Spacer(Modifier.height(4.dp))
-                    Row(
+                    if (!pending.mandatory) Row(
                         verticalAlignment = Alignment.CenterVertically,
                         modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp))
                             .pointerInput(Unit) { detectTapGestures { alwaysAllow = !alwaysAllow } }

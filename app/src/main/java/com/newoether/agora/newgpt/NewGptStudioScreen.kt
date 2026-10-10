@@ -29,7 +29,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.newoether.agora.R
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
@@ -138,13 +140,49 @@ fun NewGptStudioScreen(onClose: () -> Unit) {
     var githubRepos by remember { mutableStateOf(emptyList<String>()) }
     var githubStatus by rememberSaveable { mutableStateOf("") }
 
+    var selectedSwarmRoot by rememberSaveable {
+        mutableStateOf<String?>(agents.firstOrNull()?.id)
+    }
+    var swarmTask by rememberSaveable { mutableStateOf("") }
+    var swarmStatus by remember { mutableStateOf("") }
+    var swarmRunning by remember { mutableStateOf(false) }
+    var swarmJob by remember { mutableStateOf<Job?>(null) }
+    var sourceCatalogStatus by rememberSaveable { mutableStateOf("") }
+
+    val importCatalogRole: (ThorRolePreset) -> Unit = { role ->
+        if (agents.any { it.id == role.id }) {
+            sourceCatalogStatus = "Profil jest już w AGENTS."
+        } else {
+            val imported = StudioAgent(
+                id = role.id,
+                name = role.name,
+                description = role.description,
+                systemPrompt = role.prompt,
+                tools = emptyList(),
+                handoffs = emptyList(),
+            )
+            agents = (agents + imported).sortedBy { it.name.lowercase() }
+            saveAgents(context, agents)
+            sourceCatalogStatus = "Dodano: " + role.name +
+                ". Profil nie otrzymuje automatycznie dostępu do narzędzi."
+        }
+    }
+
+
     DisposableEffect(Unit) {
-        onDispose { dualRuntime.close() }
+        onDispose {
+            swarmJob?.cancel()
+            dualRuntime.close()
+        }
     }
 
     val ggufPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenMultipleDocuments()
     ) { uris ->
+        if (swarmRunning) {
+            modelStatus = "Nie można zmieniać modeli podczas wykonywania zespołu."
+            return@rememberLauncherForActivityResult
+        }
         if (uris.size != 2) {
             modelStatus = "Wybierz dokładnie dwa pliki GGUF."
             return@rememberLauncherForActivityResult
@@ -239,8 +277,15 @@ fun NewGptStudioScreen(onClose: () -> Unit) {
         }
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
-            TabRow(selectedTabIndex = tab, containerColor = Surface, contentColor = Gold) {
-                listOf("AGENTS", "APP BUILDER", "GGUF ×2", "GITHUB").forEachIndexed { index, title ->
+            ScrollableTabRow(
+                selectedTabIndex = tab,
+                containerColor = Surface,
+                contentColor = Gold,
+                edgePadding = 8.dp,
+            ) {
+                (listOf("AGENTS", "APP BUILDER", "GGUF ×2", "GITHUB", "THOR SWARM") +
+                    ThorPacketRegistry.packets.map { "ŹRÓDŁA " + it.number }
+                ).forEachIndexed { index, title ->
                     Tab(
                         selected = tab == index,
                         onClick = { tab = index },
@@ -294,11 +339,111 @@ fun NewGptStudioScreen(onClose: () -> Unit) {
                 2 -> GgufPanel(
                     modelPaths, modelStatus,
                     dualRuntime.isLoaded(0) && dualRuntime.isLoaded(1),
-                    { ggufPicker.launch(arrayOf("*/*")) },
                     {
-                        dualRuntime.close()
-                        modelStatus = "Modele zwolnione z pamięci."
+                        if (swarmRunning) {
+                            modelStatus = "Najpierw przerwij wykonywanie zespołu."
+                        } else {
+                            ggufPicker.launch(arrayOf("*/*"))
+                        }
+                    },
+                    {
+                        if (swarmRunning) {
+                            modelStatus = "Najpierw przerwij wykonywanie zespołu."
+                        } else {
+                            dualRuntime.close()
+                            modelStatus = "Modele zwolnione z pamięci."
+                        }
                     }
+                )
+                in 5..(4 + ThorPacketRegistry.packets.size) -> {
+                    val packet = requireNotNull(ThorPacketRegistry.packetByTabIndex(tab))
+                    ThorSourcePacketPanel(
+                        packetNumber = packet.number,
+                        sources = packet.sources,
+                        roles = packet.roles,
+                        importedIds = agents.map { it.id }.toSet(),
+                        status = sourceCatalogStatus,
+                        onImport = importCatalogRole,
+                    )
+                }
+                4 -> StudioSwarmPanel(
+                    agents = agents.map { it.id to it.name },
+                    rootId = selectedSwarmRoot?.takeIf { id -> agents.any { it.id == id } }
+                        ?: agents.firstOrNull()?.id,
+                    task = swarmTask,
+                    status = swarmStatus,
+                    running = swarmRunning,
+                    modelsLoaded = dualRuntime.isLoaded(0) && dualRuntime.isLoaded(1),
+                    onRootSelected = { selectedSwarmRoot = it },
+                    onTaskChanged = { swarmTask = it },
+                    onRun = {
+                        if (!swarmRunning) {
+                            val root = selectedSwarmRoot
+                                ?.takeIf { id -> agents.any { it.id == id } }
+                                ?: agents.firstOrNull()?.id
+                            if (root != null) {
+                                val agentSnapshot = agents.map {
+                                    SwarmAgent(
+                                        id = it.id,
+                                        name = it.name,
+                                        systemPrompt = it.systemPrompt,
+                                        handoffs = it.handoffs,
+                                    )
+                                }
+                                val requestedTask = swarmTask
+                                swarmRunning = true
+                                swarmStatus = "Uruchamianie ograniczonego zespołu..."
+                                swarmJob = scope.launch {
+                                    try {
+                                        val records = withContext(Dispatchers.IO) {
+                                            StudioSwarmRuntime(
+                                                GgufSwarmInference(dualRuntime),
+                                            ).execute(
+                                                agents = agentSnapshot,
+                                                rootId = root,
+                                                task = requestedTask,
+                                                onEvent = { event ->
+                                                    withContext(Dispatchers.Main) {
+                                                        when (event) {
+                                                            is SwarmExecutionEvent.Started -> {
+                                                                swarmStatus +=
+                                                                    "\n▶ ${event.step}/${event.total}: " +
+                                                                    "${event.agentName} · GGUF ${event.modelSlot + 1}"
+                                                            }
+                                                            is SwarmExecutionEvent.Completed -> {
+                                                                swarmStatus += buildString {
+                                                                    appendLine()
+                                                                    appendLine("✓ ${event.step}/${event.total} ukończony")
+                                                                    appendLine("── ${event.record.agentName} ──")
+                                                                    append(event.record.output)
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                },
+                                            )
+                                        }
+                                        swarmStatus += "\nZakończono ${records.size} kroków."
+                                    } catch (cancel: CancellationException) {
+                                        swarmStatus += "\nPrzerwano wykonanie."
+                                        throw cancel
+                                    } catch (failure: Exception) {
+                                        swarmStatus += "\nBłąd zespołu: " +
+                                            (failure.message ?: "Nieznana przyczyna")
+                                    } finally {
+                                        swarmRunning = false
+                                        swarmJob = null
+                                    }
+                                }
+                            }
+                        }
+                    },
+                    onCancel = {
+                        if (swarmRunning) {
+                            swarmStatus += "\nAnulowanie zadania..."
+                            swarmJob?.cancel()
+                        }
+                    },
                 )
                 3 -> GithubPanel(
                     githubToken, githubRepo, githubPath, githubContent, githubRepos, githubStatus,
