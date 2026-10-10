@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.sp
 import com.newoether.agora.R
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
@@ -145,6 +146,7 @@ fun NewGptStudioScreen(onClose: () -> Unit) {
     var swarmTask by rememberSaveable { mutableStateOf("") }
     var swarmStatus by remember { mutableStateOf("") }
     var swarmRunning by remember { mutableStateOf(false) }
+    var swarmJob by remember { mutableStateOf<Job?>(null) }
     var sourceCatalogStatus by rememberSaveable { mutableStateOf("") }
 
     val importCatalogRole: (ThorRolePreset) -> Unit = { role ->
@@ -168,12 +170,19 @@ fun NewGptStudioScreen(onClose: () -> Unit) {
 
 
     DisposableEffect(Unit) {
-        onDispose { dualRuntime.close() }
+        onDispose {
+            swarmJob?.cancel()
+            dualRuntime.close()
+        }
     }
 
     val ggufPicker = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenMultipleDocuments()
     ) { uris ->
+        if (swarmRunning) {
+            modelStatus = "Nie można zmieniać modeli podczas wykonywania zespołu."
+            return@rememberLauncherForActivityResult
+        }
         if (uris.size != 2) {
             modelStatus = "Wybierz dokładnie dwa pliki GGUF."
             return@rememberLauncherForActivityResult
@@ -330,10 +339,20 @@ fun NewGptStudioScreen(onClose: () -> Unit) {
                 2 -> GgufPanel(
                     modelPaths, modelStatus,
                     dualRuntime.isLoaded(0) && dualRuntime.isLoaded(1),
-                    { ggufPicker.launch(arrayOf("*/*")) },
                     {
-                        dualRuntime.close()
-                        modelStatus = "Modele zwolnione z pamięci."
+                        if (swarmRunning) {
+                            modelStatus = "Najpierw przerwij wykonywanie zespołu."
+                        } else {
+                            ggufPicker.launch(arrayOf("*/*"))
+                        }
+                    },
+                    {
+                        if (swarmRunning) {
+                            modelStatus = "Najpierw przerwij wykonywanie zespołu."
+                        } else {
+                            dualRuntime.close()
+                            modelStatus = "Modele zwolnione z pamięci."
+                        }
                     }
                 )
                 in 5..(4 + ThorPacketRegistry.packets.size) -> {
@@ -372,34 +391,57 @@ fun NewGptStudioScreen(onClose: () -> Unit) {
                                     )
                                 }
                                 val requestedTask = swarmTask
-                                scope.launch {
-                                    swarmRunning = true
-                                    swarmStatus = "Uruchamianie ograniczonego zespołu..."
+                                swarmRunning = true
+                                swarmStatus = "Uruchamianie ograniczonego zespołu..."
+                                swarmJob = scope.launch {
                                     try {
                                         val records = withContext(Dispatchers.IO) {
                                             StudioSwarmRuntime(
-                                                GgufSwarmInference(dualRuntime)
-                                            ).execute(agentSnapshot, root, requestedTask)
+                                                GgufSwarmInference(dualRuntime),
+                                            ).execute(
+                                                agents = agentSnapshot,
+                                                rootId = root,
+                                                task = requestedTask,
+                                                onEvent = { event ->
+                                                    withContext(Dispatchers.Main) {
+                                                        when (event) {
+                                                            is SwarmExecutionEvent.Started -> {
+                                                                swarmStatus +=
+                                                                    "\n▶ ${event.step}/${event.total}: " +
+                                                                    "${event.agentName} · GGUF ${event.modelSlot + 1}"
+                                                            }
+                                                            is SwarmExecutionEvent.Completed -> {
+                                                                swarmStatus += buildString {
+                                                                    appendLine()
+                                                                    appendLine("✓ ${event.step}/${event.total} ukończony")
+                                                                    appendLine("── ${event.record.agentName} ──")
+                                                                    append(event.record.output)
+                                                                }
+                                                            }
+                                                        }
+                                                    }
+                                                },
+                                            )
                                         }
-                                        swarmStatus = buildString {
-                                            appendLine("Zakończono ${records.size} kroków.")
-                                            for (record in records) {
-                                                appendLine()
-                                                appendLine("── ${record.agentName} · GGUF ${record.modelSlot + 1} ──")
-                                                appendLine(record.output)
-                                            }
-                                        }
+                                        swarmStatus += "\nZakończono ${records.size} kroków."
                                     } catch (cancel: CancellationException) {
-                                        swarmStatus = "Przerwano wykonanie."
+                                        swarmStatus += "\nPrzerwano wykonanie."
                                         throw cancel
                                     } catch (failure: Exception) {
-                                        swarmStatus = "Błąd zespołu: " +
+                                        swarmStatus += "\nBłąd zespołu: " +
                                             (failure.message ?: "Nieznana przyczyna")
                                     } finally {
                                         swarmRunning = false
+                                        swarmJob = null
                                     }
                                 }
                             }
+                        }
+                    },
+                    onCancel = {
+                        if (swarmRunning) {
+                            swarmStatus += "\nAnulowanie zadania..."
+                            swarmJob?.cancel()
                         }
                     },
                 )
