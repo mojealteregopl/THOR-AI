@@ -15,11 +15,11 @@ Katalog nie dowodzi działania serwera, dostępności urządzenia, zgodności bi
 | Lp. | Repozytorium | Typ rzeczywisty | Ryzyko | Decyzja |
 |---:|---|---|---|---|
 | 1 | [L3MON-1](https://github.com/mojealterego/L3MON-1) | Android RAT | RESTRICTED | Dostęp do SMS, mikrofonu, plików; brak ścieżki wykonywania |
-| 2 | [chappie-bot](https://github.com/mojealterego/chappie-bot) | Bot komunikacyjny | Wysokie | Historyczny Python/Docker; widoczne w root nazwy plików mogące zawierać sekrety |
+| 2 | [chappie-bot](https://github.com/mojealterego/chappie-bot) | Bot komunikacyjny | RESTRICTED | Historyczny Python/Docker; kwarantanna do audytu potencjalnej ekspozycji sekretów |
 | 3 | [lore](https://github.com/mojealterego/lore) | VCS | Wysokie | Kontrola wersji dużych artefaktów; status pre-1.0 |
 | 4 | [Flowise](https://github.com/mojealterego/Flowise) | Agenci/workflow | Średnie | Flow builder; README wskazuje archiwalny stan upstream |
 | 5 | [xalgorix](https://github.com/mojealterego/xalgorix) | Pentest | Wysokie | Tylko autoryzowany audyt i izolowany zakres |
-| 6 | [mailtm-client](https://github.com/mojealterego/mailtm-client) | Disposable email | Wysokie | Nie łączyć z automatyczną rejestracją kont |
+| 6 | [mailtm-client](https://github.com/mojealterego/mailtm-client) | Disposable email | RESTRICTED | Wstrzymany import funkcji weryfikacji; audyt zgodności |
 | 7 | [mcp-server](https://github.com/mojealterego/mcp-server) | Bramka SMS/OTP | RESTRICTED | Broker weryfikacji kont i zakup numerów; brak profilu wykonawczego |
 | 8 | [railpack](https://github.com/mojealterego/railpack) | DevOps | Wysokie | Budowanie obrazów OCI z kodu |
 | 9 | [milvus](https://github.com/mojealterego/milvus) | Baza danych | Średnie | Wektorowa wyszukiwarka i RAG |
@@ -80,3 +80,8 @@ Profile mogą być importowane ręcznie do AGENTS i wykorzystywane w już istnie
 - Połączenia MCP, workflow z prawdziwymi serwerami, automatyzacja telefonu i streaming SIP — **nieuruchamiane**.
 - Import źródeł obcych frameworków do monorepo THOR — **niedozwolony bez indywidualnego przeglądu licencji i bezpieczeństwa**.
 - Kod katalogu i rejestru sprawdzany statycznie przez odczyt GitHub; statyczna kontrola nie zastępuje testów wykonaniowych.
+
+
+## Aktualizacja zasad kwarantanny
+
+W THOR `chappie-bot` oraz `mailtm-client` otrzymują również `RESTRICTED` do czasu ręcznej kontroli uprawnień, sekretów i zgodności użycia. Łącznie **4 źródła paczki 04** mają status `RESTRICTED`. Nie odczytujemy plików mogących zawierać klucze i nie konfigurujemy połączeń do usług weryfikacji tożsamości.
