@@ -274,7 +274,9 @@ fun NewGptStudioScreen(onClose: () -> Unit) {
                 contentColor = Gold,
                 edgePadding = 8.dp,
             ) {
-                listOf("AGENTS", "APP BUILDER", "GGUF ×2", "GITHUB", "THOR SWARM", "ŹRÓDŁA 01", "ŹRÓDŁA 02", "ŹRÓDŁA 03").forEachIndexed { index, title ->
+                (listOf("AGENTS", "APP BUILDER", "GGUF ×2", "GITHUB", "THOR SWARM") +
+                    ThorPacketRegistry.packets.map { "ŹRÓDŁA " + it.number }
+                ).forEachIndexed { index, title ->
                     Tab(
                         selected = tab == index,
                         onClick = { tab = index },
@@ -334,21 +336,17 @@ fun NewGptStudioScreen(onClose: () -> Unit) {
                         modelStatus = "Modele zwolnione z pamięci."
                     }
                 )
-                7 -> ThorPacketThreePanel(
-                    importedIds = agents.map { it.id }.toSet(),
-                    status = sourceCatalogStatus,
-                    onImport = importCatalogRole,
-                )
-                6 -> ThorPacketTwoPanel(
-                    importedIds = agents.map { it.id }.toSet(),
-                    status = sourceCatalogStatus,
-                    onImport = importCatalogRole,
-                )
-                5 -> ThorPacketOnePanel(
-                    importedIds = agents.map { it.id }.toSet(),
-                    status = sourceCatalogStatus,
-                    onImport = importCatalogRole,
-                )
+                in 5..(4 + ThorPacketRegistry.packets.size) -> {
+                    val packet = requireNotNull(ThorPacketRegistry.packetByTabIndex(tab))
+                    ThorSourcePacketPanel(
+                        packetNumber = packet.number,
+                        sources = packet.sources,
+                        roles = packet.roles,
+                        importedIds = agents.map { it.id }.toSet(),
+                        status = sourceCatalogStatus,
+                        onImport = importCatalogRole,
+                    )
+                }
                 4 -> StudioSwarmPanel(
                     agents = agents.map { it.id to it.name },
                     rootId = selectedSwarmRoot?.takeIf { id -> agents.any { it.id == id } }
