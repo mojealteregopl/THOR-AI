@@ -68,6 +68,20 @@ fun ThorPacketThreePanel(
 )
 
 @Composable
+fun ThorPacketFourPanel(
+    importedIds: Set<String>,
+    status: String,
+    onImport: (ThorRolePreset) -> Unit,
+) = ThorSourcePacketPanel(
+    packetNumber = "04",
+    sources = ThorPacketFourCatalog.sources,
+    roles = ThorPacketFourCatalog.roles,
+    importedIds = importedIds,
+    status = status,
+    onImport = onImport,
+)
+
+@Composable
 fun ThorSourcePacketPanel(
     packetNumber: String,
     sources: List<ThorSource>,
