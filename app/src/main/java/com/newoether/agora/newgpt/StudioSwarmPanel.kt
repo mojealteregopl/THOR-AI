@@ -39,6 +39,7 @@ fun StudioSwarmPanel(
     onRootSelected: (String) -> Unit,
     onTaskChanged: (String) -> Unit,
     onRun: () -> Unit,
+    onCancel: () -> Unit,
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(14.dp),
@@ -88,6 +89,14 @@ fun StudioSwarmPanel(
                     ) {
                         if (running) CircularProgressIndicator()
                         else Text("URUCHOM ZESPÓŁ AGENTÓW")
+                    }
+                    if (running) {
+                        OutlinedButton(
+                            onClick = onCancel,
+                            modifier = Modifier.fillMaxWidth(),
+                        ) {
+                            Text("PRZERWIJ WYKONYWANIE", color = SwarmGold)
+                        }
                     }
                 }
             }
