@@ -14,6 +14,7 @@ object ThorPacketRegistry {
         ThorSourcePacket("04", ThorPacketFourCatalog.sources, ThorPacketFourCatalog.roles),
         ThorSourcePacket("05", ThorPacketFiveCatalog.sources, ThorPacketFiveCatalog.roles),
         ThorSourcePacket("06", ThorPacketSixCatalog.sources, ThorPacketSixCatalog.roles),
+        ThorSourcePacket("07", ThorPacketSevenCatalog.sources, ThorPacketSevenCatalog.roles),
     ).also { packets ->
         require(packets.map(ThorSourcePacket::number).distinct().size == packets.size)
         val sources = packets.flatMap(ThorSourcePacket::sources)
