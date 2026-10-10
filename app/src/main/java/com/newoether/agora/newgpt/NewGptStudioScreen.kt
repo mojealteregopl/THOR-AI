@@ -29,6 +29,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.newoether.agora.R
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -138,6 +139,13 @@ fun NewGptStudioScreen(onClose: () -> Unit) {
     var githubRepos by remember { mutableStateOf(emptyList<String>()) }
     var githubStatus by rememberSaveable { mutableStateOf("") }
 
+    var selectedSwarmRoot by rememberSaveable {
+        mutableStateOf<String?>(agents.firstOrNull()?.id)
+    }
+    var swarmTask by rememberSaveable { mutableStateOf("") }
+    var swarmStatus by remember { mutableStateOf("") }
+    var swarmRunning by remember { mutableStateOf(false) }
+
     DisposableEffect(Unit) {
         onDispose { dualRuntime.close() }
     }
@@ -239,8 +247,13 @@ fun NewGptStudioScreen(onClose: () -> Unit) {
         }
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding)) {
-            TabRow(selectedTabIndex = tab, containerColor = Surface, contentColor = Gold) {
-                listOf("AGENTS", "APP BUILDER", "GGUF ×2", "GITHUB").forEachIndexed { index, title ->
+            ScrollableTabRow(
+                selectedTabIndex = tab,
+                containerColor = Surface,
+                contentColor = Gold,
+                edgePadding = 8.dp,
+            ) {
+                listOf("AGENTS", "APP BUILDER", "GGUF ×2", "GITHUB", "THOR SWARM").forEachIndexed { index, title ->
                     Tab(
                         selected = tab == index,
                         onClick = { tab = index },
@@ -299,6 +312,62 @@ fun NewGptStudioScreen(onClose: () -> Unit) {
                         dualRuntime.close()
                         modelStatus = "Modele zwolnione z pamięci."
                     }
+                )
+                4 -> StudioSwarmPanel(
+                    agents = agents.map { it.id to it.name },
+                    rootId = selectedSwarmRoot?.takeIf { id -> agents.any { it.id == id } }
+                        ?: agents.firstOrNull()?.id,
+                    task = swarmTask,
+                    status = swarmStatus,
+                    running = swarmRunning,
+                    modelsLoaded = dualRuntime.isLoaded(0) && dualRuntime.isLoaded(1),
+                    onRootSelected = { selectedSwarmRoot = it },
+                    onTaskChanged = { swarmTask = it },
+                    onRun = {
+                        if (!swarmRunning) {
+                            val root = selectedSwarmRoot
+                                ?.takeIf { id -> agents.any { it.id == id } }
+                                ?: agents.firstOrNull()?.id
+                            if (root != null) {
+                                val agentSnapshot = agents.map {
+                                    SwarmAgent(
+                                        id = it.id,
+                                        name = it.name,
+                                        systemPrompt = it.systemPrompt,
+                                        handoffs = it.handoffs,
+                                    )
+                                }
+                                val requestedTask = swarmTask
+                                scope.launch {
+                                    swarmRunning = true
+                                    swarmStatus = "Uruchamianie ograniczonego zespołu..."
+                                    try {
+                                        val records = withContext(Dispatchers.IO) {
+                                            StudioSwarmRuntime(
+                                                GgufSwarmInference(dualRuntime)
+                                            ).execute(agentSnapshot, root, requestedTask)
+                                        }
+                                        swarmStatus = buildString {
+                                            appendLine("Zakończono ${records.size} kroków.")
+                                            for (record in records) {
+                                                appendLine()
+                                                appendLine("── ${record.agentName} · GGUF ${record.modelSlot + 1} ──")
+                                                appendLine(record.output)
+                                            }
+                                        }
+                                    } catch (cancel: CancellationException) {
+                                        swarmStatus = "Przerwano wykonanie."
+                                        throw cancel
+                                    } catch (failure: Exception) {
+                                        swarmStatus = "Błąd zespołu: " +
+                                            (failure.message ?: "Nieznana przyczyna")
+                                    } finally {
+                                        swarmRunning = false
+                                    }
+                                }
+                            }
+                        }
+                    },
                 )
                 3 -> GithubPanel(
                     githubToken, githubRepo, githubPath, githubContent, githubRepos, githubStatus,
