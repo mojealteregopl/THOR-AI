@@ -8,11 +8,11 @@ package com.newoether.agora.newgpt
 object ThorPacketFourCatalog {
     private val sourceData = """
 mojealterego/L3MON-1|main|b0f1878897d3b46f97396ab96670e212a3f9806f|ANDROID|RESTRICTED|Android RAT i przechwytywanie danych - kwarantanna
-mojealterego/chappie-bot|master|c31fbac34519921494208e685d8024fdcea561e0|ORCHESTRATION|EXTERNAL_MUTATION|Historyczny bot komunikatora - wymagany audyt sekretów
+mojealterego/chappie-bot|master|c31fbac34519921494208e685d8024fdcea561e0|ORCHESTRATION|RESTRICTED|Historyczny bot komunikatora - kwarantanna do audytu sekretów
 mojealterego/lore|main|46b1136674fbcbbaf80807d2de43165ad9b39c4c|INFRASTRUCTURE|PRIVILEGED_EXECUTION|Lore - wersjonowanie dużych artefaktów
 mojealterego/Flowise|main|d862a79bac6d0ed7225e4cec2132aa56c88cbb8b|ORCHESTRATION|REMOTE_ACCESS|Flowise wizualne agenty - upstream archiwalny
 mojealterego/xalgorix|main|5b3bfc90c631556491906ccd9dd2c36e17578a77|INFRASTRUCTURE|PRIVILEGED_EXECUTION|Pentest i niezależne potwierdzanie podatności
-mojealterego/mailtm-client|main|88218cef2caa949bdac353e4edec879768bf92ea|CLIENT|EXTERNAL_MUTATION|Klient jednorazowej poczty MailTM
+mojealterego/mailtm-client|main|88218cef2caa949bdac353e4edec879768bf92ea|CLIENT|RESTRICTED|Klient jednorazowej poczty i OTP - wymaga przeglądu zgodności
 mojealterego/mcp-server|main|133bbfd01dba79fadc38dcb49aaf721282b11618|MCP|RESTRICTED|Zakup numerów i SMS OTP - wyłączone
 mojealterego/railpack|main|462069b876a5763c3b8be27ee1b2405ec6b5be97|INFRASTRUCTURE|PRIVILEGED_EXECUTION|Railpack budowanie obrazów OCI
 mojealterego/milvus|master|82bcce8867c92e7d55f669e034a00dcb0f37d2bc|INFRASTRUCTURE|REMOTE_ACCESS|Milvus wektorowa baza danych
