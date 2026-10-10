@@ -48,6 +48,9 @@ class ThorPacketFourCatalogTest {
             "mojealterego/mailtm-client",
             "mojealterego/chappie-bot",
         )
+        val sources = ThorPacketFourCatalog.sources.associateBy { it.repository }
+        assertTrue(excluded.all { sources[it]?.risk == ThorSourceRisk.RESTRICTED })
+        assertTrue(excluded.all { sources[it]?.activated == false })
         assertTrue(ThorPacketFourCatalog.roles.none { role ->
             role.sourceRepositories.any(excluded::contains)
         })
