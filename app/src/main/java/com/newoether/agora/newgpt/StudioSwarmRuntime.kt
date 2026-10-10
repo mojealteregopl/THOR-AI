@@ -1,6 +1,7 @@
 package com.newoether.agora.newgpt
 
 import kotlinx.coroutines.withTimeout
+import java.util.ArrayDeque
 
 /**
  * Bounded, human-triggered GGUF handoff execution.
