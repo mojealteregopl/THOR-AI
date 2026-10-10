@@ -68,7 +68,7 @@ fun ThorPacketThreePanel(
 )
 
 @Composable
-private fun ThorSourcePacketPanel(
+fun ThorSourcePacketPanel(
     packetNumber: String,
     sources: List<ThorSource>,
     roles: List<ThorRolePreset>,
