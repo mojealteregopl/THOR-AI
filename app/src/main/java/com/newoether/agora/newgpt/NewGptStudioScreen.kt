@@ -147,6 +147,26 @@ fun NewGptStudioScreen(onClose: () -> Unit) {
     var swarmRunning by remember { mutableStateOf(false) }
     var sourceCatalogStatus by rememberSaveable { mutableStateOf("") }
 
+    val importCatalogRole: (ThorRolePreset) -> Unit = { role ->
+        if (agents.any { it.id == role.id }) {
+            sourceCatalogStatus = "Profil jest już w AGENTS."
+        } else {
+            val imported = StudioAgent(
+                id = role.id,
+                name = role.name,
+                description = role.description,
+                systemPrompt = role.prompt,
+                tools = emptyList(),
+                handoffs = emptyList(),
+            )
+            agents = (agents + imported).sortedBy { it.name.lowercase() }
+            saveAgents(context, agents)
+            sourceCatalogStatus = "Dodano: " + role.name +
+                ". Profil nie otrzymuje automatycznie dostępu do narzędzi."
+        }
+    }
+
+
     DisposableEffect(Unit) {
         onDispose { dualRuntime.close() }
     }
@@ -317,46 +337,12 @@ fun NewGptStudioScreen(onClose: () -> Unit) {
                 6 -> ThorPacketTwoPanel(
                     importedIds = agents.map { it.id }.toSet(),
                     status = sourceCatalogStatus,
-                    onImport = { role ->
-                        if (agents.any { it.id == role.id }) {
-                            sourceCatalogStatus = "Profil jest już w AGENTS."
-                        } else {
-                            val imported = StudioAgent(
-                                id = role.id,
-                                name = role.name,
-                                description = role.description,
-                                systemPrompt = role.prompt,
-                                tools = emptyList(),
-                                handoffs = emptyList(),
-                            )
-                            agents = (agents + imported).sortedBy { it.name.lowercase() }
-                            saveAgents(context, agents)
-                            sourceCatalogStatus = "Dodano: " + role.name +
-                                ". Profil nie otrzymuje automatycznie dostępu do narzędzi."
-                        }
-                    },
+                    onImport = importCatalogRole,
                 )
                 5 -> ThorPacketOnePanel(
                     importedIds = agents.map { it.id }.toSet(),
                     status = sourceCatalogStatus,
-                    onImport = { role ->
-                        if (agents.any { it.id == role.id }) {
-                            sourceCatalogStatus = "Profil jest już w AGENTS."
-                        } else {
-                            val imported = StudioAgent(
-                                id = role.id,
-                                name = role.name,
-                                description = role.description,
-                                systemPrompt = role.prompt,
-                                tools = emptyList(),
-                                handoffs = emptyList(),
-                            )
-                            agents = (agents + imported).sortedBy { it.name.lowercase() }
-                            saveAgents(context, agents)
-                            sourceCatalogStatus = "Dodano: " + role.name +
-                                ". Profil nie otrzymuje automatycznie dostępu do narzędzi."
-                        }
-                    },
+                    onImport = importCatalogRole,
                 )
                 4 -> StudioSwarmPanel(
                     agents = agents.map { it.id to it.name },
