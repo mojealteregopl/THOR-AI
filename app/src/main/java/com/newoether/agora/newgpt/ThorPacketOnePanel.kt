@@ -54,6 +54,20 @@ fun ThorPacketTwoPanel(
 )
 
 @Composable
+fun ThorPacketThreePanel(
+    importedIds: Set<String>,
+    status: String,
+    onImport: (ThorRolePreset) -> Unit,
+) = ThorSourcePacketPanel(
+    packetNumber = "03",
+    sources = ThorPacketThreeCatalog.sources,
+    roles = ThorPacketThreeCatalog.roles,
+    importedIds = importedIds,
+    status = status,
+    onImport = onImport,
+)
+
+@Composable
 private fun ThorSourcePacketPanel(
     packetNumber: String,
     sources: List<ThorSource>,
@@ -134,7 +148,11 @@ private fun ThorSourcePacketPanel(
                     Text(source.capability, color = CatalogText)
                     Text(
                         "Typ: ${source.kind} · Ryzyko: ${source.risk} · " +
-                            "Stan: ${if (source.activated) "AKTYWNE" else "TYLKO ŹRÓDŁO"}",
+                            "Stan: ${when {
+                            source.risk == ThorSourceRisk.RESTRICTED -> "ZABLOKOWANE"
+                            source.activated -> "AKTYWNE"
+                            else -> "TYLKO ŹRÓDŁO"
+                        }}",
                         color = CatalogText,
                         style = MaterialTheme.typography.labelMedium,
                     )
