@@ -25,6 +25,8 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -302,14 +304,17 @@ fun NewGptStudioScreen(onClose: () -> Unit) {
                 )
                 3 -> GithubPanel(
                     githubToken, githubRepo, githubPath, githubContent, githubRepos, githubStatus,
-                    {
-                        githubToken = it
-                        github.setToken(it)
-                    },
+                    { githubToken = it },
                     { githubRepo = it }, { githubPath = it }, { githubContent = it },
                     {
                         scope.launch {
                             githubStatus = "Pobieranie repozytoriów…"
+                            val credential = runCatching { github.setToken(githubToken) }
+                            if (credential.isFailure) {
+                                githubStatus = "Błąd zabezpieczenia tokenu: " +
+                                    (credential.exceptionOrNull()?.message ?: "nieznany błąd")
+                                return@launch
+                            }
                             github.listRepositories()
                                 .onSuccess {
                                     githubRepos = it
@@ -321,6 +326,12 @@ fun NewGptStudioScreen(onClose: () -> Unit) {
                     {
                         scope.launch {
                             githubStatus = "Zapisywanie pliku…"
+                            val credential = runCatching { github.setToken(githubToken) }
+                            if (credential.isFailure) {
+                                githubStatus = "Błąd zabezpieczenia tokenu: " +
+                                    (credential.exceptionOrNull()?.message ?: "nieznany błąd")
+                                return@launch
+                            }
                             github.createOrUpdateFile(
                                 githubRepo, githubPath, githubContent,
                                 "NewGPT Studio: update " + githubPath
@@ -366,6 +377,7 @@ private fun StudioTextField(
     label: String,
     minLines: Int = 1,
     singleLine: Boolean = minLines == 1,
+    sensitive: Boolean = false,
 ) {
     OutlinedTextField(
         value, onValueChange,
@@ -373,6 +385,7 @@ private fun StudioTextField(
         label = { Text(label) },
         minLines = minLines,
         singleLine = singleLine,
+        visualTransformation = if (sensitive) PasswordVisualTransformation() else VisualTransformation.None,
         colors = OutlinedTextFieldDefaults.colors(
             focusedBorderColor = Gold,
             unfocusedBorderColor = GoldDeep,
@@ -550,7 +563,7 @@ private fun GithubPanel(
     ) {
         item {
             StudioCard("GITHUB · POŁĄCZENIE", Icons.Default.Code) {
-                StudioTextField(token, onToken, "GitHub Personal Access Token", singleLine = true)
+                StudioTextField(token, onToken, "GitHub Personal Access Token", singleLine = true, sensitive = true)
                 StudioTextField(repo, onRepo, "Repozytorium owner/name")
                 StudioTextField(path, onPath, "Ścieżka pliku")
                 StudioTextField(content, onContent, "Treść pliku", 8, false)
