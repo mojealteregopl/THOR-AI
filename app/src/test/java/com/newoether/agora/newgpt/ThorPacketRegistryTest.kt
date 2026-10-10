@@ -7,23 +7,24 @@ import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class ThorPacketRegistryTest {
-    @Test fun mapsAllFivePacketsToDeterministicAndroidTabIndices() {
-        assertEquals(listOf("01", "02", "03", "04", "05"), ThorPacketRegistry.packets.map { it.number })
+    @Test fun mapsAllSixPacketsToDeterministicAndroidTabIndices() {
+        assertEquals(listOf("01", "02", "03", "04", "05", "06"), ThorPacketRegistry.packets.map { it.number })
         assertEquals("01", ThorPacketRegistry.packetByTabIndex(5)?.number)
         assertEquals("02", ThorPacketRegistry.packetByTabIndex(6)?.number)
         assertEquals("03", ThorPacketRegistry.packetByTabIndex(7)?.number)
         assertEquals("04", ThorPacketRegistry.packetByTabIndex(8)?.number)
         assertEquals("05", ThorPacketRegistry.packetByTabIndex(9)?.number)
+        assertEquals("06", ThorPacketRegistry.packetByTabIndex(10)?.number)
         assertNull(ThorPacketRegistry.packetByTabIndex(4))
-        assertNull(ThorPacketRegistry.packetByTabIndex(10))
+        assertNull(ThorPacketRegistry.packetByTabIndex(11))
         assertNull(ThorPacketRegistry.packetByTabIndex(-1))
     }
 
     @Test fun exposesNonoverlappingSourceAndAgentIds() {
-        assertEquals(150, ThorPacketRegistry.sources.size)
-        assertEquals(86, ThorPacketRegistry.roles.size)
-        assertEquals(150, ThorPacketRegistry.sources.map { it.repository }.toSet().size)
-        assertEquals(86, ThorPacketRegistry.roles.map { it.id }.toSet().size)
+        assertEquals(169, ThorPacketRegistry.sources.size)
+        assertEquals(100, ThorPacketRegistry.roles.size)
+        assertEquals(169, ThorPacketRegistry.sources.map { it.repository }.toSet().size)
+        assertEquals(100, ThorPacketRegistry.roles.map { it.id }.toSet().size)
     }
 
     @Test fun allSourcesAreInactiveAndRestrictedSourcesHaveNoAgentAccess() {
