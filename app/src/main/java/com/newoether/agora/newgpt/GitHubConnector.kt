@@ -48,10 +48,14 @@ class GitHubConnector(context: Context) {
 
     suspend fun listRepositories(): Result<List<String>> = withContext(Dispatchers.IO) {
         runCatching {
-            requestJson("https://api.github.com/user/repos?per_page=100&sort=updated") { body ->
-                val array = JSONArray(body)
-                buildList {
-                    for (i in 0 until array.length()) add(array.getJSONObject(i).getString("full_name"))
+            GitHubRepositoryPaging.collect { page ->
+                requestJson("https://api.github.com/user/repos?per_page=100&sort=updated&page=$page") { body ->
+                    val array = JSONArray(body)
+                    buildList {
+                        for (i in 0 until array.length()) {
+                            add(array.getJSONObject(i).getString("full_name"))
+                        }
+                    }
                 }
             }
         }
