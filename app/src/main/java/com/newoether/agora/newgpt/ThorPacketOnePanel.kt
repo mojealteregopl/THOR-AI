@@ -30,6 +30,37 @@ fun ThorPacketOnePanel(
     importedIds: Set<String>,
     status: String,
     onImport: (ThorRolePreset) -> Unit,
+) = ThorSourcePacketPanel(
+    packetNumber = "01",
+    sources = ThorPacketOneCatalog.sources,
+    roles = ThorPacketOneCatalog.roles,
+    importedIds = importedIds,
+    status = status,
+    onImport = onImport,
+)
+
+@Composable
+fun ThorPacketTwoPanel(
+    importedIds: Set<String>,
+    status: String,
+    onImport: (ThorRolePreset) -> Unit,
+) = ThorSourcePacketPanel(
+    packetNumber = "02",
+    sources = ThorPacketTwoCatalog.sources,
+    roles = ThorPacketTwoCatalog.roles,
+    importedIds = importedIds,
+    status = status,
+    onImport = onImport,
+)
+
+@Composable
+private fun ThorSourcePacketPanel(
+    packetNumber: String,
+    sources: List<ThorSource>,
+    roles: List<ThorRolePreset>,
+    importedIds: Set<String>,
+    status: String,
+    onImport: (ThorRolePreset) -> Unit,
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(14.dp),
@@ -37,9 +68,9 @@ fun ThorPacketOnePanel(
         contentPadding = PaddingValues(bottom = 24.dp),
     ) {
         item {
-            Text("THOR · PACZKA 01", color = CatalogGold, style = MaterialTheme.typography.titleLarge)
+            Text("THOR · PACZKA $packetNumber", color = CatalogGold, style = MaterialTheme.typography.titleLarge)
             Text(
-                "23 unikalne repozytoria; 9 lokalnych profili specjalistów. " +
+                "${sources.size} unikalnych repozytoriów; ${roles.size} lokalnych profili specjalistów. " +
                     "Import profilu tworzy tylko konfigurację promptu. " +
                     "Źródła MCP, CLI, API i automatyzacji pozostają niepodłączone.",
                 color = CatalogText,
@@ -59,7 +90,7 @@ fun ThorPacketOnePanel(
                 modifier = Modifier.padding(top = 10.dp),
             )
         }
-        items(ThorPacketOneCatalog.roles, key = { it.id }) { role ->
+        items(roles, key = { it.id }) { role ->
             Card(
                 colors = CardDefaults.cardColors(containerColor = CatalogSurface),
                 shape = RoundedCornerShape(16.dp),
@@ -90,7 +121,7 @@ fun ThorPacketOnePanel(
                 modifier = Modifier.padding(top = 10.dp),
             )
         }
-        items(ThorPacketOneCatalog.sources, key = { it.repository }) { source ->
+        items(sources, key = { it.repository }) { source ->
             Card(
                 colors = CardDefaults.cardColors(containerColor = CatalogSurface),
                 shape = RoundedCornerShape(16.dp),
