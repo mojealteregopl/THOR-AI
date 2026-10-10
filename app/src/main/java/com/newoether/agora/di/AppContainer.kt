@@ -24,6 +24,7 @@ import com.newoether.agora.automation.TaskManager
 import com.newoether.agora.tool.AutomationToolProvider
 import com.newoether.agora.tool.McpToolProvider
 import com.newoether.agora.mcp.McpRegistry
+import com.newoether.agora.mcp.McpApprovalPrompt
 import com.newoether.agora.sandbox.SandboxManagerFactory
 import com.newoether.agora.service.MaintenanceDebtWorker
 import com.newoether.agora.service.TaskWorker
@@ -156,7 +157,17 @@ class AppContainer(
     }
 
     val mcpRegistry: McpRegistry by lazy {
-        McpRegistry(appContext, settingsRepository, appScope)
+        McpRegistry(
+            context = appContext,
+            settings = settingsRepository,
+            scope = appScope,
+            approvalPrompt = McpApprovalPrompt { request ->
+                shellConfirmationController.confirmRequired(
+                    server = "MCP · ${request.server}",
+                    summary = request.summary,
+                )
+            },
+        )
     }
 
     val mcpToolProvider: McpToolProvider by lazy {
