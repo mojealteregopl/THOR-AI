@@ -274,7 +274,7 @@ fun NewGptStudioScreen(onClose: () -> Unit) {
                 contentColor = Gold,
                 edgePadding = 8.dp,
             ) {
-                listOf("AGENTS", "APP BUILDER", "GGUF ×2", "GITHUB", "THOR SWARM", "ŹRÓDŁA 01", "ŹRÓDŁA 02").forEachIndexed { index, title ->
+                listOf("AGENTS", "APP BUILDER", "GGUF ×2", "GITHUB", "THOR SWARM", "ŹRÓDŁA 01", "ŹRÓDŁA 02", "ŹRÓDŁA 03").forEachIndexed { index, title ->
                     Tab(
                         selected = tab == index,
                         onClick = { tab = index },
@@ -333,6 +333,11 @@ fun NewGptStudioScreen(onClose: () -> Unit) {
                         dualRuntime.close()
                         modelStatus = "Modele zwolnione z pamięci."
                     }
+                )
+                7 -> ThorPacketThreePanel(
+                    importedIds = agents.map { it.id }.toSet(),
+                    status = sourceCatalogStatus,
+                    onImport = importCatalogRole,
                 )
                 6 -> ThorPacketTwoPanel(
                     importedIds = agents.map { it.id }.toSet(),
