@@ -90,6 +90,7 @@ class McpRegistry(
     private val settings: SettingsRepository,
     private val scope: CoroutineScope,
     private val workDispatcher: CoroutineDispatcher = Dispatchers.IO,
+    private val approvalPrompt: McpApprovalPrompt? = null,
 ) {
     companion object {
         private const val INITIAL_RETRY_MS = 5_000L
@@ -116,6 +117,7 @@ class McpRegistry(
 
     private val json = Json { ignoreUnknownKeys = true }
     private val imageStore = ToolImageStore(context)
+    private val executionGate = McpExecutionGate(approvalPrompt)
     private val lock = Any()
     private val runtimes = mutableMapOf<String, Runtime>()
     private val pendingBuilds = mutableMapOf<String, McpRuntimeBuildTicket>()
@@ -181,6 +183,22 @@ class McpRegistry(
                 "MCP tool '$publicName' requires a complete JSON object",
                 isError = true,
             )
+
+        val decision = executionGate.authorize(descriptor, args) {
+            synchronized(lock) {
+                runtimes[descriptor.serverId] === runtime &&
+                    currentConfig(descriptor.serverId) == runtime.config &&
+                    runtime.config.enabled &&
+                    snapshots.value[descriptor.serverId]?.status == McpConnectionStatus.CONNECTED &&
+                    snapshots.value[descriptor.serverId]?.tools?.any { it == descriptor && it.enabled } == true
+            }
+        }
+        if (decision != McpGateDecision.ALLOWED) {
+            return ToolExecutionResult(
+                text = "MCP tool call blocked by pre-execution policy: ${decision.name}",
+                isError = true,
+            )
+        }
 
         return try {
             val payload = runtime.client.callTool(descriptor.remote.name, args)
