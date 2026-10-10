@@ -1,7 +1,7 @@
 package com.newoether.agora.newgpt
 
 enum class ThorSourceKind { ORCHESTRATION, MCP, CATALOG, ANDROID, INFRASTRUCTURE, KNOWLEDGE, CREATIVE, GAME, CLIENT }
-enum class ThorSourceRisk { READ_ONLY, REMOTE_ACCESS, EXTERNAL_MUTATION, PRIVILEGED_EXECUTION }
+enum class ThorSourceRisk { READ_ONLY, REMOTE_ACCESS, EXTERNAL_MUTATION, PRIVILEGED_EXECUTION, RESTRICTED }
 
 data class ThorSource(
     val repository: String,
