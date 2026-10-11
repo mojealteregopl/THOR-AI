@@ -521,7 +521,7 @@ fun NewGptStudioScreen(onClose: () -> Unit) {
                     githubToken, githubRepo, githubPath, githubContent, githubRepos, githubStatus,
                     {
                         githubToken = it
-                        github.setToken(it)
+                        github.updateAccessToken(it)
                     },
                     { githubRepo = it }, { githubPath = it }, { githubContent = it },
                     {
