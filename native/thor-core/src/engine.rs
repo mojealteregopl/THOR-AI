@@ -87,7 +87,7 @@ impl NativeCoreEngine {
             tokio::time::timeout(CONNECT_TIMEOUT, zenoh::open(config))
                 .await
                 .context("Secure Zenoh handshake exceeded 15 seconds")?
-                .context("Secure Zenoh handshake failed")
+                .map_err(|_| anyhow!("Secure Zenoh handshake failed"))
         })?;
 
         let id = self.allocate_id()?;
@@ -123,7 +123,7 @@ impl NativeCoreEngine {
             tokio::time::timeout(SEND_TIMEOUT, session.put(address, bytes.to_vec()))
                 .await
                 .context("Zenoh publication timed out")?
-                .context("Zenoh publication failed")
+                .map_err(|_| anyhow!("Zenoh publication failed"))
         })?;
         self.metrics.sent.fetch_add(1, Ordering::Relaxed);
         Ok(())
@@ -144,7 +144,7 @@ impl NativeCoreEngine {
             tokio::time::timeout(SEND_TIMEOUT, session.declare_subscriber(address))
                 .await
                 .context("Zenoh subscription timed out")?
-                .context("Zenoh subscription failed")
+                .map_err(|_| anyhow!("Zenoh subscription failed"))
         })?;
         let (sender, receiver) = mpsc::sync_channel(SUBSCRIPTION_QUEUE);
         let dropped = Arc::clone(&self.metrics.dropped);
@@ -232,7 +232,7 @@ impl NativeCoreEngine {
             tokio::time::timeout(SEND_TIMEOUT, session.close())
                 .await
                 .context("Zenoh disconnect timed out")?
-                .context("Zenoh disconnect failed")
+                .map_err(|_| anyhow!("Zenoh disconnect failed"))
         })
     }
 
