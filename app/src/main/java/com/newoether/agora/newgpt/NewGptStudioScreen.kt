@@ -38,6 +38,10 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 import java.io.File
+import java.security.DigestInputStream
+import java.security.MessageDigest
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
 import java.util.UUID
 
 private val Obsidian = Color(0xFF030304)
@@ -94,15 +98,42 @@ private fun saveAgents(context: Context, agents: List<StudioAgent>) {
         .apply()
 }
 
-private fun copyUriToApp(context: Context, uri: Uri, name: String): File {
-    val directory = File(context.filesDir, "newgpt/gguf").apply { mkdirs() }
-    val safeName = name.replace(Regex("[^A-Za-z0-9._-]"), "_")
-    val target = File(directory, safeName)
-    context.contentResolver.openInputStream(uri).use { input ->
-        requireNotNull(input) { "Nie można otworzyć pliku." }
-        target.outputStream().use { output -> input.copyTo(output, 1024 * 1024) }
+private data class ImportedGguf(val file: File, val sha256: String)
+
+private fun copyUriToApp(context: Context, uri: Uri, name: String): ImportedGguf {
+    val directory = File(context.filesDir, "newgpt/gguf")
+    check(directory.isDirectory || directory.mkdirs()) { "Nie można utworzyć katalogu modeli" }
+    val safeName = name.replace(Regex("[^A-Za-z0-9._-]"), "_").take(120)
+    require(safeName.isNotBlank() && safeName != "." && safeName != "..") {
+        "Niedozwolona nazwa modelu"
     }
-    return target
+    val target = File(directory, safeName)
+    val staging = File.createTempFile("thor-gguf-", ".part", directory)
+    val digest = MessageDigest.getInstance("SHA-256")
+    try {
+        context.contentResolver.openInputStream(uri).use { input ->
+            requireNotNull(input) { "Nie można otworzyć pliku." }
+            DigestInputStream(input, digest).use { source ->
+                java.io.FileOutputStream(staging).use { output ->
+                    source.copyTo(output, 1024 * 1024)
+                    output.fd.sync()
+                }
+            }
+        }
+        require(staging.length() > 0L) { "Pusty plik GGUF" }
+        Files.move(
+            staging.toPath(),
+            target.toPath(),
+            StandardCopyOption.ATOMIC_MOVE,
+            StandardCopyOption.REPLACE_EXISTING,
+        )
+    } finally {
+        if (staging.exists()) staging.delete()
+    }
+    return ImportedGguf(
+        file = target,
+        sha256 = digest.digest().joinToString("") { "%02x".format(it) },
+    )
 }
 
 @Composable
@@ -131,6 +162,7 @@ fun NewGptStudioScreen(onClose: () -> Unit) {
     var appPlan by rememberSaveable { mutableStateOf("") }
 
     var modelPaths by rememberSaveable { mutableStateOf(emptyList<String>()) }
+    var modelDigests by rememberSaveable { mutableStateOf(emptyList<String>()) }
     var modelStatus by rememberSaveable { mutableStateOf("Wybierz dokładnie dwa pliki GGUF.") }
 
     var githubToken by remember { mutableStateOf(github.token) }
@@ -194,7 +226,8 @@ fun NewGptStudioScreen(onClose: () -> Unit) {
                 val copied = uris.mapIndexed { index, uri ->
                     copyUriToApp(context, uri, "model_" + (index + 1) + "_" + (uri.lastPathSegment ?: "model.gguf"))
                 }
-                modelPaths = copied.map(File::getAbsolutePath)
+                modelPaths = copied.map { it.file.absolutePath }
+                modelDigests = copied.map { it.sha256 }
                 val loaded = withContext(Dispatchers.IO) {
                     dualRuntime.loadBoth(modelPaths[0], modelPaths[1])
                 }
@@ -404,6 +437,7 @@ fun NewGptStudioScreen(onClose: () -> Unit) {
                                             StudioSwarmRuntime(
                                                 inference = GgufSwarmInference(dualRuntime),
                                                 checkpointStore = recovery,
+                                                modelDigests = modelDigests.toList(),
                                             ).execute(
                                                 agents = agentSnapshot,
                                                 rootId = root,
