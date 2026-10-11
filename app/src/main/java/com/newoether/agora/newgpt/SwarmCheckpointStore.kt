@@ -28,11 +28,23 @@ interface SwarmCheckpointStore {
 
 /** Binds progress to task, agent configuration, parent links and model-slot allocation. */
 object SwarmExecutionFingerprint {
-    fun digest(task: String, steps: List<SwarmStep>): ByteArray {
+    fun digest(
+        task: String,
+        steps: List<SwarmStep>,
+        modelDigests: List<String> = emptyList(),
+    ): ByteArray {
+        require(modelDigests.size == 2 || modelDigests.isEmpty()) {
+            "Expected exactly two model identities"
+        }
+        require(modelDigests.all { id ->
+            id.length == 64 && id.all { it in '0'..'9' || it in 'a'..'f' }
+        }) { "Invalid GGUF model SHA-256" }
         val bytes = ByteArrayOutputStream()
         DataOutputStream(bytes).use { stream ->
-            stream.writeUTF("THOR_SWARM_EXECUTION_V1")
+            stream.writeUTF("THOR_SWARM_EXECUTION_V2")
             stream.writeUTF(task)
+            stream.writeInt(modelDigests.size)
+            modelDigests.forEach(stream::writeUTF)
             stream.writeInt(steps.size)
             for (step in steps) {
                 stream.writeUTF(step.agent.id)
