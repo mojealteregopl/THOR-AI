@@ -177,6 +177,7 @@ class FileSwarmCheckpointStore(
                 } finally {
                     if (temporary.exists()) temporary.delete()
                 }
+                Unit
             }
         }
 
