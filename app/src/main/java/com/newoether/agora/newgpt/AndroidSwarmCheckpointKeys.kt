@@ -34,4 +34,11 @@ internal object AndroidSwarmCheckpointKeys {
         generator.init(spec)
         return generator.generateKey()
     }
+
+    /** Explicit user reset after a completed, rejected, or obsolete run. */
+    @Synchronized
+    fun discard() {
+        val store = KeyStore.getInstance(STORE).apply { load(null) }
+        if (store.containsAlias(ALIAS)) store.deleteEntry(ALIAS)
+    }
 }
