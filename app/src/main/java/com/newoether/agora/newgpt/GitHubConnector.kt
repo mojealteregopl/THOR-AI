@@ -21,7 +21,7 @@ class GitHubConnector(context: Context) {
         get() = SecretCrypto.decrypt(prefs.getString("token", "").orEmpty())
         private set(value) { prefs.edit().putString("token", SecretCrypto.encrypt(value)).apply() }
 
-    fun setToken(value: String) { token = value.trim() }
+    fun updateAccessToken(value: String) { token = value.trim() }
     fun clearToken() { prefs.edit().remove("token").apply() }
 
     suspend fun listRepositories(): Result<List<String>> = withContext(Dispatchers.IO) {
