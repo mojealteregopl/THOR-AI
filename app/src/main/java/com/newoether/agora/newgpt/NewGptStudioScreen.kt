@@ -146,6 +146,7 @@ fun NewGptStudioScreen(onClose: () -> Unit) {
     var swarmTask by rememberSaveable { mutableStateOf("") }
     var swarmStatus by remember { mutableStateOf("") }
     var swarmRunning by remember { mutableStateOf(false) }
+    var swarmResetting by remember { mutableStateOf(false) }
     var swarmJob by remember { mutableStateOf<Job?>(null) }
     var sourceCatalogStatus by rememberSaveable { mutableStateOf("") }
 
@@ -372,12 +373,12 @@ fun NewGptStudioScreen(onClose: () -> Unit) {
                         ?: agents.firstOrNull()?.id,
                     task = swarmTask,
                     status = swarmStatus,
-                    running = swarmRunning,
+                    running = swarmRunning || swarmResetting,
                     modelsLoaded = dualRuntime.isLoaded(0) && dualRuntime.isLoaded(1),
                     onRootSelected = { selectedSwarmRoot = it },
                     onTaskChanged = { swarmTask = it },
                     onRun = {
-                        if (!swarmRunning) {
+                        if (!swarmRunning && !swarmResetting) {
                             val root = selectedSwarmRoot
                                 ?.takeIf { id -> agents.any { it.id == id } }
                                 ?: agents.firstOrNull()?.id
@@ -453,6 +454,31 @@ fun NewGptStudioScreen(onClose: () -> Unit) {
                         if (swarmRunning) {
                             swarmStatus += "\nAnulowanie zadania..."
                             swarmJob?.cancel()
+                        }
+                    },
+                    onResetCheckpoint = {
+                        if (!swarmRunning && !swarmResetting) {
+                            swarmResetting = true
+                            scope.launch {
+                                try {
+                                    withContext(Dispatchers.IO) {
+                                        val checkpoint = File(
+                                            context.filesDir,
+                                            "thor/swarm/" + FileSwarmCheckpointStore.CHECKPOINT_FILE_NAME,
+                                        )
+                                        if (checkpoint.exists() && !checkpoint.delete()) {
+                                            error("Nie można usunąć zapisu wznowienia")
+                                        }
+                                        AndroidSwarmCheckpointKeys.discard()
+                                    }
+                                    swarmStatus = "Usunięto zapis wznowienia. Kolejne zadanie ruszy od początku."
+                                } catch (failure: Exception) {
+                                    swarmStatus = "Błąd usuwania zapisu: " +
+                                        (failure.message ?: "Nieznana przyczyna")
+                                } finally {
+                                    swarmResetting = false
+                                }
+                            }
                         }
                     },
                 )
