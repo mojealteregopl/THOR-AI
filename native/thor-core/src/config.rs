@@ -1,4 +1,4 @@
-use anyhow::{bail, Context, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use std::fs;
 use std::path::Path;
 use zenoh::config::Config;
@@ -48,27 +48,27 @@ impl SecurePeer {
 
     pub fn to_config(&self) -> Result<Config> {
         let mut config = Config::default();
-        config.insert_json5("mode", r#""client""#)?;
-        config.insert_json5(
+        insert_config(&mut config, "mode", r#""client""#)?;
+        insert_config(&mut config, 
             "connect/endpoints",
             &serde_json::to_string(&vec![&self.endpoint])?,
         )?;
         // No UDP, TCP, WS or implicit insecure discovery. Only authenticated TLS.
-        config.insert_json5("scouting/multicast/enabled", "false")?;
-        config.insert_json5("scouting/gossip/enabled", "false")?;
-        config.insert_json5("transport/link/protocols", r#"["tls"]"#)?;
-        config.insert_json5("transport/link/tls/enable_mtls", "true")?;
-        config.insert_json5("transport/link/tls/verify_name_on_connect", "true")?;
-        config.insert_json5("transport/link/tls/close_link_on_expiration", "true")?;
-        config.insert_json5(
+        insert_config(&mut config, "scouting/multicast/enabled", "false")?;
+        insert_config(&mut config, "scouting/gossip/enabled", "false")?;
+        insert_config(&mut config, "transport/link/protocols", r#"["tls"]"#)?;
+        insert_config(&mut config, "transport/link/tls/enable_mtls", "true")?;
+        insert_config(&mut config, "transport/link/tls/verify_name_on_connect", "true")?;
+        insert_config(&mut config, "transport/link/tls/close_link_on_expiration", "true")?;
+        insert_config(&mut config, 
             "transport/link/tls/root_ca_certificate",
             &serde_json::to_string(&self.ca_file)?,
         )?;
-        config.insert_json5(
+        insert_config(&mut config, 
             "transport/link/tls/connect_certificate",
             &serde_json::to_string(&self.client_certificate)?,
         )?;
-        config.insert_json5(
+        insert_config(&mut config, 
             "transport/link/tls/connect_private_key",
             &serde_json::to_string(&self.client_key)?,
         )?;
@@ -92,4 +92,8 @@ fn validate_credential_path(path: &str) -> Result<()> {
         bail!("TLS credential must be a regular non-empty file under 1 MiB");
     }
     Ok(())
+}
+
+fn insert_config(config: &mut Config, field: &str, value: &str) -> Result<()> {
+    config.insert_json5(field, value).map_err(|_| anyhow!("Zenoh rejected TLS configuration field: {field}"))
 }
