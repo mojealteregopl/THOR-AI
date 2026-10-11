@@ -5,6 +5,7 @@ import org.junit.Assert.*
 import org.junit.Test
 
 class StudioSwarmRecoveryTest {
+    private val modelDigests = listOf("a".repeat(64), "b".repeat(64))
     private val lead = SwarmAgent("lead", "Lead", "plan", listOf("qa"))
     private val qa = SwarmAgent("qa", "QA", "check", emptyList())
     private class MemoryCheckpoint : SwarmCheckpointStore {
@@ -55,7 +56,7 @@ class StudioSwarmRecoveryTest {
     @Test fun refusesInvalidRestoredPrefixBeforeStartingInference() = runBlocking {
         val journal = MemoryCheckpoint()
         val steps = SwarmPlanCompiler().compile(listOf(lead, qa), "lead")
-        journal.identity = SwarmExecutionFingerprint.digest("Build", steps).toList()
+        journal.identity = SwarmExecutionFingerprint.digest("Build", steps, modelDigests).toList()
         journal.stored = listOf(SwarmRecord("qa", "QA", 1, "invalid order"))
         var executed = false
         val runner = StudioSwarmRuntime(SwarmInference { _, _, _ ->
@@ -72,8 +73,16 @@ class StudioSwarmRecoveryTest {
     @Test fun fingerprintChangesWithTaskAndSystemPrompt() {
         val plan = SwarmPlanCompiler().compile(listOf(lead, qa), "lead")
         val revised = SwarmPlanCompiler().compile(listOf(lead.copy(systemPrompt = "new plan"), qa), "lead")
-        val initial = SwarmExecutionFingerprint.digest("Build", plan).toList()
-        assertNotEquals(initial, SwarmExecutionFingerprint.digest("Other task", plan).toList())
-        assertNotEquals(initial, SwarmExecutionFingerprint.digest("Build", revised).toList())
+        val initial = SwarmExecutionFingerprint.digest("Build", plan, modelDigests).toList()
+        assertNotEquals(initial, SwarmExecutionFingerprint.digest("Other task", plan, modelDigests).toList())
+        assertNotEquals(initial, SwarmExecutionFingerprint.digest("Build", revised, modelDigests).toList())
+        assertNotEquals(
+            initial,
+            SwarmExecutionFingerprint.digest(
+                "Build",
+                plan,
+                listOf("c".repeat(64), "b".repeat(64)),
+            ).toList(),
+        )
     }
 }
