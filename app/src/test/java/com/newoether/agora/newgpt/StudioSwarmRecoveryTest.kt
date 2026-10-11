@@ -32,7 +32,7 @@ class StudioSwarmRecoveryTest {
             calls++
             if (calls == 2) error("second inference unavailable")
             "first answer"
-        }, checkpointStore = journal)
+        }, checkpointStore = journal, modelDigests = modelDigests)
         try {
             first.execute(listOf(lead, qa), "lead", "Build")
             fail("Expected an interrupted execution")
@@ -45,7 +45,7 @@ class StudioSwarmRecoveryTest {
             slots += slot
             assertTrue(input.contains("first answer"))
             "second answer"
-        }, checkpointStore = journal)
+        }, checkpointStore = journal, modelDigests = modelDigests)
         val results = second.execute(listOf(lead, qa), "lead", "Build") { events += it }
         assertEquals(listOf(1), slots)
         assertEquals(listOf("first answer", "second answer"), results.map { it.output })
@@ -62,7 +62,7 @@ class StudioSwarmRecoveryTest {
         val runner = StudioSwarmRuntime(SwarmInference { _, _, _ ->
             executed = true
             "output"
-        }, checkpointStore = journal)
+        }, checkpointStore = journal, modelDigests = modelDigests)
         try {
             runner.execute(listOf(lead, qa), "lead", "Build")
             fail("Expected malformed checkpoint rejection")
