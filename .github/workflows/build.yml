@@ -21,6 +21,21 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  native:
+    name: Rust Zenoh core tests (no APK)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check Rust toolchain
+        run: |
+          rustc --version
+          cargo --version
+      - name: Compile and execute native core tests
+        run: cargo test --manifest-path native/thor-core/Cargo.toml --all-targets
+      - name: Check native library release compilation
+        run: cargo build --manifest-path native/thor-core/Cargo.toml --release
+
   test:
     name: Unit tests
     runs-on: ubuntu-latest
