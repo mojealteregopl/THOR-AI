@@ -396,8 +396,13 @@ fun NewGptStudioScreen(onClose: () -> Unit) {
                                 swarmJob = scope.launch {
                                     try {
                                         val records = withContext(Dispatchers.IO) {
+                                            val recovery = FileSwarmCheckpointStore(
+                                                directory = File(context.filesDir, "thor/swarm"),
+                                                secretKey = AndroidSwarmCheckpointKeys.loadOrCreate(),
+                                            )
                                             StudioSwarmRuntime(
-                                                GgufSwarmInference(dualRuntime),
+                                                inference = GgufSwarmInference(dualRuntime),
+                                                checkpointStore = recovery,
                                             ).execute(
                                                 agents = agentSnapshot,
                                                 rootId = root,
@@ -405,6 +410,12 @@ fun NewGptStudioScreen(onClose: () -> Unit) {
                                                 onEvent = { event ->
                                                     withContext(Dispatchers.Main) {
                                                         when (event) {
+                                                            is SwarmExecutionEvent.Restored -> {
+                                                                swarmStatus +=
+                                                                    "\nWznowiono zapisane kroki: " +
+                                                                    "${event.count}/${event.total}. " +
+                                                                    "Wyniki odtworzono lokalnie."
+                                                            }
                                                             is SwarmExecutionEvent.Started -> {
                                                                 swarmStatus +=
                                                                     "\n▶ ${event.step}/${event.total}: " +
