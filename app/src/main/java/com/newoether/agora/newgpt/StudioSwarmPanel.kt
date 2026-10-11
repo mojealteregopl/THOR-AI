@@ -40,6 +40,7 @@ fun StudioSwarmPanel(
     onTaskChanged: (String) -> Unit,
     onRun: () -> Unit,
     onCancel: () -> Unit,
+    onResetCheckpoint: () -> Unit,
 ) {
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(14.dp),
@@ -90,6 +91,18 @@ fun StudioSwarmPanel(
                         if (running) CircularProgressIndicator()
                         else Text("URUCHOM ZESPÓŁ AGENTÓW")
                     }
+                    OutlinedButton(
+                        onClick = onResetCheckpoint,
+                        enabled = !running,
+                        modifier = Modifier.fillMaxWidth(),
+                    ) {
+                        Text("USUŃ ZAPIS WZNOWIENIA", color = SwarmGold)
+                    }
+                    Text(
+                        "Po przerwaniu zadania THOR wznawia ukończone kroki z szyfrowanego " +
+                            "zapisu lokalnego. Usunięcie zapisu uruchamia kolejny przebieg od początku.",
+                        color = SwarmText,
+                    )
                     if (running) {
                         OutlinedButton(
                             onClick = onCancel,
