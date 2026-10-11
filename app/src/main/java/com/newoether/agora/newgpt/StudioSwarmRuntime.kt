@@ -37,6 +37,11 @@ data class SwarmRecord(
  * Consumers should treat model text as untrusted data.
  */
 sealed interface SwarmExecutionEvent {
+    data class Restored(
+        val count: Int,
+        val total: Int,
+    ) : SwarmExecutionEvent
+
     data class Started(
         val step: Int,
         val total: Int,
@@ -100,6 +105,7 @@ class StudioSwarmRuntime(
     private val inference: SwarmInference,
     private val compiler: SwarmPlanCompiler = SwarmPlanCompiler(),
     private val stepTimeoutMs: Long = 90_000L,
+    private val checkpointStore: SwarmCheckpointStore? = null,
 ) {
     init {
         require(stepTimeoutMs in 1_000L..180_000L) { "Invalid inference timeout" }
@@ -114,8 +120,34 @@ class StudioSwarmRuntime(
         require(task.isNotBlank() && task.length <= 8_000) { "Task must have 1..8000 characters" }
         val steps = compiler.compile(agents, rootId)
         val completed = linkedMapOf<String, SwarmRecord>()
+        val fingerprint = if (checkpointStore != null) {
+            SwarmExecutionFingerprint.digest(task, steps)
+        } else {
+            null
+        }
+        val restored = if (checkpointStore != null && fingerprint != null) {
+            checkpointStore.read(fingerprint)
+        } else {
+            emptyList()
+        }
+        require(restored.size <= steps.size) { "Checkpoint has more steps than the execution plan" }
+        restored.forEachIndexed { index, record ->
+            val step = steps[index]
+            require(
+                record.agentId == step.agent.id &&
+                    record.agentName == step.agent.name &&
+                    record.modelSlot == step.modelSlot &&
+                    record.output.isNotBlank() &&
+                    record.output.length <= 12_000
+            ) { "Checkpoint is inconsistent with the execution plan" }
+            completed[record.agentId] = record
+        }
+        if (restored.isNotEmpty()) {
+            onEvent(SwarmExecutionEvent.Restored(restored.size, steps.size))
+        }
 
-        for ((index, step) in steps.withIndex()) {
+        for (index in restored.size until steps.size) {
+            val step = steps[index]
             currentCoroutineContext().ensureActive()
             val parent = step.parentId?.let { id ->
                 checkNotNull(completed[id]) { "Missing parent execution: $id" }
@@ -156,6 +188,9 @@ class StudioSwarmRuntime(
                 output = output,
             )
             completed[step.agent.id] = record
+            if (checkpointStore != null && fingerprint != null) {
+                checkpointStore.write(fingerprint, completed.values.toList())
+            }
             onEvent(
                 SwarmExecutionEvent.Completed(
                     step = index + 1,
@@ -164,6 +199,7 @@ class StudioSwarmRuntime(
                 ),
             )
         }
+        checkpointStore?.delete()
         return completed.values.toList()
     }
 }
