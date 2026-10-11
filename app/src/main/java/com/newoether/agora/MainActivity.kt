@@ -469,49 +469,8 @@ fun MainNavigation(
         )
     }
 
-    // Remote shell action confirmation gate
-    val pendingShellCommand by viewModel.pendingShellCommand.collectAsState()
-    pendingShellCommand?.let { pending ->
-        var alwaysAllow by remember(pending) { mutableStateOf(false) }
-        AlertDialog(
-            containerColor = MaterialTheme.colorScheme.surfaceContainer,
-            onDismissRequest = { viewModel.resolveShellConfirmation(allow = false) },
-            icon = { Icon(Icons.Default.Terminal, null, modifier = Modifier.size(40.dp), tint = MaterialTheme.colorScheme.primary) },
-            title = { Text(if (pending.mandatory) "Zatwierdź pojedyncze wywołanie MCP: ${pending.server}" else stringResource(R.string.shell_confirm_title, pending.server), fontWeight = FontWeight.Bold) },
-            text = {
-                Column {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .heightIn(max = 240.dp)
-                            .verticalScroll(rememberScrollState()),
-                    ) {
-                        ChatMarkdownCodeBlock(code = pending.summary)
-                    }
-                    Spacer(Modifier.height(4.dp))
-                    if (!pending.mandatory) Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(8.dp))
-                            .pointerInput(Unit) { detectTapGestures { alwaysAllow = !alwaysAllow } }
-                    ) {
-                        Checkbox(checked = alwaysAllow, onCheckedChange = { alwaysAllow = it })
-                        Text(stringResource(R.string.shell_confirm_always), style = MaterialTheme.typography.bodyMedium)
-                    }
-                }
-            },
-            confirmButton = {
-                TextButton(onClick = { viewModel.resolveShellConfirmation(allow = true, alwaysAllowServer = alwaysAllow) }) {
-                    Text(stringResource(R.string.shell_confirm_allow))
-                }
-            },
-            dismissButton = {
-                TextButton(
-                    onClick = { viewModel.resolveShellConfirmation(allow = false) },
-                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)
-                ) { Text(stringResource(R.string.shell_confirm_deny)) }
-            }
-        )
-    }
+    // The modal permission boundary is isolated to keep the Activity focused on navigation.
+    ShellActionConfirmationDialog(viewModel)
 
     // Crash report — opt-in, shown once on the first launch after an unexpected exit
     val crashContext = LocalContext.current
