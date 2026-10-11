@@ -1,4 +1,4 @@
-name: Build APK
+name: THOR CI and gated release
 
 on:
   push:
@@ -6,6 +6,12 @@ on:
   pull_request:
     branches: [master]
   workflow_dispatch:
+    inputs:
+      release_apk:
+        description: "Build release APK only after completion and review on master"
+        type: boolean
+        required: true
+        default: false
 
 permissions:
   contents: read
@@ -55,7 +61,9 @@ jobs:
           retention-days: 14
 
   build:
+    name: Explicit release build (master only)
     needs: test
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.release_apk == true && github.ref == 'refs/heads/master' }}
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
