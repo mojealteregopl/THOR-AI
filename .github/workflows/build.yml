@@ -35,6 +35,14 @@ jobs:
         run: cargo test --manifest-path native/thor-core/Cargo.toml --all-targets
       - name: Check native library release compilation
         run: cargo build --manifest-path native/thor-core/Cargo.toml --release
+      - name: Verify exported JNI method symbols
+        run: |
+          library=native/thor-core/target/release/libthor_nativecore.so
+          test -s "$library"
+          symbols=$(nm -D --defined-only "$library")
+          for method in nativeOpen nativePublish nativeSubscribe nativePoll nativeUnsubscribe nativeClose nativeCounters; do
+            echo "$symbols" | grep -Fq "Java_com_newoether_agora_thor_nativecore_ThorNativeCoreBridge_$method"
+          done
 
   test:
     name: Unit tests
