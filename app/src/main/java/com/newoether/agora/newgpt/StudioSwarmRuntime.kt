@@ -106,9 +106,16 @@ class StudioSwarmRuntime(
     private val compiler: SwarmPlanCompiler = SwarmPlanCompiler(),
     private val stepTimeoutMs: Long = 90_000L,
     private val checkpointStore: SwarmCheckpointStore? = null,
+    private val modelDigests: List<String> = emptyList(),
 ) {
     init {
         require(stepTimeoutMs in 1_000L..180_000L) { "Invalid inference timeout" }
+        require(checkpointStore == null || (
+            modelDigests.size == 2 &&
+                modelDigests.all { id ->
+                    id.length == 64 && id.all { it in '0'..'9' || it in 'a'..'f' }
+                }
+        )) { "Checkpoint recovery requires both loaded GGUF SHA-256 identities" }
     }
 
     suspend fun execute(
@@ -121,7 +128,7 @@ class StudioSwarmRuntime(
         val steps = compiler.compile(agents, rootId)
         val completed = linkedMapOf<String, SwarmRecord>()
         val fingerprint = if (checkpointStore != null) {
-            SwarmExecutionFingerprint.digest(task, steps)
+            SwarmExecutionFingerprint.digest(task, steps, modelDigests)
         } else {
             null
         }
