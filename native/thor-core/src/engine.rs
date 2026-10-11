@@ -94,7 +94,7 @@ impl NativeCoreEngine {
         let mut sessions = self.sessions.lock().map_err(|_| anyhow!("Session registry poisoned"))?;
         if sessions.len() >= MAX_ACTIVE_SESSIONS {
             drop(sessions);
-            let _ = self.runtime.block_on(session.close());
+            let _ = self.runtime.block_on(async { session.close().await });
             bail!("THOR session capacity reached during handshake");
         }
         sessions.insert(id, session);
